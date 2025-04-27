@@ -413,6 +413,21 @@
                     clearInterval(pollingInterval);
                 }
             }
+            fetch('https://sign-language-to-text-speech.onrender.com/get_latest_detection')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "no_detection") {
+                console.log("No gesture detected.");
+                // Handle no detection case (e.g., show message to user)
+                } else {
+                console.log("Gesture detected:", data);
+                // Handle the detected gesture
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Handle error (e.g., show error message to user)
+            });
 
             // Check video feed
             const videoFeed = document.getElementById('video-feed');
