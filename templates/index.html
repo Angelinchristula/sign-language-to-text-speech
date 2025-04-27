@@ -1,0 +1,530 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Language Detection</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .main-container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+        .left-section {
+            flex: 0 0 60%;
+            background-color: white;
+            padding: 20px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-right: 2px solid #dee2e6;
+        }
+        .right-section {
+            flex: 0 0 40%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            background-color: #f1f3f5;
+        }
+        .video-container {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 3px solid #dee2e6;
+        }
+        #video-feed {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        #latest-sign {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            min-height: 40px;
+            margin: 20px 0;
+            color: #007bff;
+        }
+        .status {
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .tts-controls, .detection-info {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+        .tts-controls {
+            margin-bottom: 10px;
+        }
+        .detection-info {
+            flex-grow: 1;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .btn-lg {
+            padding: 12px 24px;
+            font-size: 18px;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="left-section">
+            <h1 style="margin-top: 0;">Sign Language Detection</h1>
+            <div class="video-container">
+                <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Video Stream">
+            </div>
+            <div id="latest-sign"></div>
+            <div class="status" id="status-indicator">
+                Status: <span id="detection-status">Not Running</span>
+                <span id="indicator-dot" class="ms-2" style="color: red;">●</span>
+            </div>
+            <div class="controls">
+                <button id="start-btn" class="btn btn-success btn-lg">
+                    <i class="fas fa-play me-2"></i>Start Detection
+                </button>
+                <button id="stop-btn" class="btn btn-danger btn-lg" disabled>
+                    <i class="fas fa-stop me-2"></i>Stop Detection
+                </button>
+            </div>
+        </div>
+        <div class="right-section">
+            <div class="tts-controls">
+                <h4><i class="fas fa-volume-up me-2"></i>Text-to-Speech Controls</h4>
+                <div class="d-flex justify-content-center align-items-center mt-3">
+                    <span class="me-3">Enable real-time speech:</span>
+                    <label class="switch">
+                        <input type="checkbox" id="tts-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="d-flex justify-content-center mt-3">
+                    <button id="speak-pdf-btn" class="btn btn-info me-2">
+                        <i class="fas fa-play me-2"></i>Start Speech
+                    </button>
+                    <button id="stop-speech-btn" class="btn btn-danger" disabled>
+                        <i class="fas fa-stop me-2"></i>Stop Speech
+                    </button>
+                </div>
+            </div>
+            <div class="detection-info">
+                <h4><i class="fas fa-info-circle me-2"></i>Detection Information</h4>
+                <p>This application detects sign language gestures in real-time and saves the detected signs.</p>
+                <p>Words detected: <span id="detection-count">0</span></p>
+                <button id="download-btn" class="btn btn-primary mt-2">
+                    <i class="fas fa-file-pdf me-2"></i>Download Results (PDF)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Existing elements
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const statusText = document.getElementById('detection-status');
+            const indicatorDot = document.getElementById('indicator-dot');
+            const detectionCount = document.getElementById('detection-count');
+            const ttsToggle = document.getElementById('tts-toggle');
+            const latestSignDisplay = document.getElementById('latest-sign');
+            
+            // Speech control buttons
+            const speakPdfBtn = document.getElementById('speak-pdf-btn');
+            const stopSpeechBtn = document.getElementById('stop-speech-btn');
+
+            
+            
+            // Check if speech synthesis is available
+            if ('speechSynthesis' in window) {
+                console.log("Web Speech API supported");
+            } else {
+                console.warn("Web Speech API not supported");
+                alert("Your browser doesn't support text-to-speech. Please use Chrome, Edge, or Safari.");
+            }
+            
+            // Make sure these elements exist before adding event listeners
+            if (!speakPdfBtn || !stopSpeechBtn) {
+                console.error("Speech control buttons not found in the DOM");
+            } else {
+                // Initialize speech state tracking variables
+                let isSpeaking = false;
+                
+                // Function to update speech button states
+                function updateSpeechButtons(speaking) {
+                    isSpeaking = speaking;
+                    speakPdfBtn.disabled = speaking;
+                    stopSpeechBtn.disabled = !speaking;
+                }
+                
+                // Initial speech button states
+                updateSpeechButtons(false);
+                
+                // Speak PDF contents
+                speakPdfBtn.addEventListener('click', function() {
+                    speakPdfBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Loading...';
+                    speakPdfBtn.disabled = true;
+                    
+                    fetch('/speak_pdf', {
+                        method: 'POST',
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === "success" && data.text) {
+                            speakPdfBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Speech';
+                            
+                            // Use browser's speech synthesis
+                            const utterance = new SpeechSynthesisUtterance(data.text);
+                            
+                            // Set up speech events
+                            utterance.onstart = function() {
+                                updateSpeechButtons(true);
+                            };
+                            
+                            utterance.onend = function() {
+                                updateSpeechButtons(false);
+                            };
+                            
+                            utterance.onerror = function() {
+                                alert("Speech synthesis error");
+                                updateSpeechButtons(false);
+                            };
+                            
+                            // Cancel any previous speech
+                            window.speechSynthesis.cancel();
+                            
+                            // Start new speech
+                            window.speechSynthesis.speak(utterance);
+                        } else {
+                            alert("Error: " + (data.message || "No text to speak"));
+                            updateSpeechButtons(false);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert("Error communicating with server");
+                        speakPdfBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Speech';
+                        updateSpeechButtons(false);
+                    });
+                });
+                
+                // Stop speech
+                stopSpeechBtn.addEventListener('click', function() {
+                    // Stop browser speech synthesis
+                    window.speechSynthesis.cancel();
+                    
+                    // Also tell server to stop
+                    fetch('/stop_speech', {
+                        method: 'POST',
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data.message);
+                        updateSpeechButtons(false);
+                    })
+                    .catch(error => {
+                        console.error('Error stopping speech:', error);
+                    });
+                });
+            }
+
+            // Function to speak text using the browser's speech synthesis
+            let detectionQueue = [];  // Queue to store detected words
+            let pollingInterval;  // Declare pollingInterval globally
+
+            // Function to speak the text using the browser's speech synthesis
+            // Function to speak text using the browser's speech synthesis
+            // Function to speak text using the browser's speech synthesis
+            function speakText(text) {
+                if (!text || !('speechSynthesis' in window)) return;
+                
+                // Display the text in the latestSignDisplay
+                latestSignDisplay.textContent = text;
+                
+                // Cancel any ongoing speech
+                window.speechSynthesis.cancel();
+                
+                // Create a new utterance
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;  // Speech rate (0.1 to 10)
+                utterance.pitch = 1.0; // Speech pitch (0 to 2)
+                utterance.volume = 1.0; // Volume (0 to 1)
+                
+                // Start speaking
+                window.speechSynthesis.speak(utterance);
+                
+                console.log("Speaking:", text);
+                
+                // Clear the display after a few seconds
+                setTimeout(function() {
+                    if (latestSignDisplay.textContent === text) {
+                        latestSignDisplay.textContent = ''; // Clear text after speech is complete
+                    }
+                }, 3000); // Clears text after 3 seconds
+            
+
+
+                // Function to speak the next item in the queue
+                function speakNext() {
+                    if (detectionQueue.length === 0) return;  // No words left to speak
+
+                    const nextWord = detectionQueue.shift();  // Get the next word
+                    const utterance = new SpeechSynthesisUtterance(nextWord);
+
+                    utterance.onstart = function() {
+                        console.log('Speaking:', nextWord);
+                    };
+
+                    utterance.onend = function() {
+                        speakNext();  // Speak the next word once this one finishes
+                    };
+
+                    utterance.onerror = function() {
+                        console.error('Speech synthesis error');
+                    };
+
+                    // Start speaking the word
+                    window.speechSynthesis.speak(utterance);
+                }
+
+                // Start speaking if not already speaking
+                if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+                    speakNext();
+                }
+            }
+
+            // Poll for latest detections to speak
+            function startPolling() {
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                }
+
+                pollingInterval = setInterval(() => {
+                    // Use a timeout to prevent hanging requests
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 800);
+
+                    fetch('/get_latest_detection', { signal: controller.signal })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === "success" && data.detection && data.speak) {
+                                speakText(data.detection);  // Speak all detected words
+                            }
+                            clearTimeout(timeoutId);
+                        })
+                        .catch(error => {
+                            if (error.name === 'AbortError') {
+                                console.log('Fetch aborted due to timeout');
+                            } else {
+                                console.error('Error polling for detections:', error);
+                                clearInterval(pollingInterval);
+                                setTimeout(() => startPolling(), 2000);
+                            }
+                            clearTimeout(timeoutId);
+                        });
+                }, 1000);  // Poll every 1 second
+            }
+
+            
+            function stopPolling() {
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                }
+            }
+
+            // Check video feed
+            const videoFeed = document.getElementById('video-feed');
+            videoFeed.onerror = () => {
+                alert("Failed to load video feed. Please ensure the camera is connected and allowed.");
+            };
+
+            downloadBtn.addEventListener('click', function() {
+                window.location.href = '/download_pdf';
+                // Optional scroll
+                document.querySelector('.detection-info').scrollIntoView({ behavior: 'smooth' });
+            });
+
+            function updateStatus() {
+                fetch('/get_detection_status')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.is_running) {
+                            statusText.textContent = 'Running';
+                            statusText.style.color = 'green';
+                            indicatorDot.style.color = 'green';
+                            indicatorDot.classList.add('pulse');
+                            startBtn.disabled = true;
+                            stopBtn.disabled = false;
+                            
+                            // Start polling for detections when detection is running
+                            startPolling();
+                        } else {
+                            statusText.textContent = 'Not Running';
+                            statusText.style.color = 'red';
+                            indicatorDot.style.color = 'red';
+                            indicatorDot.classList.remove('pulse');
+                            startBtn.disabled = false;
+                            stopBtn.disabled = true;
+                            
+                            // Stop polling when detection is not running
+                            stopPolling();
+                        }
+                        detectionCount.textContent = data.detected_count;
+                        
+                        // Update TTS toggle if status is available
+                        if ('tts_enabled' in data) {
+                            ttsToggle.checked = data.tts_enabled;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching status:', error);
+                    });
+            }
+            
+            // Update status initially and every 2 seconds
+            updateStatus();
+            setInterval(updateStatus, 2000);
+            
+            // Start detection
+            // Add to the existing startBtn event listener code
+            startBtn.addEventListener('click', function() {
+                // Show initializing message in the video feed area
+                latestSignDisplay.textContent = "Initializing camera...";
+                // startBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Initializing...';
+                startBtn.disabled = true;
+                
+                fetch('/start_detection', {
+                    method: 'POST',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data.message);
+                    // Don't immediately call updateStatus as the camera may still be initializing
+                    // Instead, rely on the regular status polling interval
+                    // This gives the camera time to initialize
+                })
+                .catch(error => {
+                    console.error('Error starting detection:', error);
+                    startBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Detection';
+                    startBtn.disabled = false;
+                    latestSignDisplay.textContent = "Failed to start camera";
+                });
+            });
+            
+            // Stop detection
+            stopBtn.addEventListener('click', function() {
+                fetch('/stop_detection', {
+                    method: 'POST',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data.message);
+                    updateStatus();
+                    // Clear the latest sign display
+                    latestSignDisplay.textContent = '';
+                })
+                .catch(error => {
+                    console.error('Error stopping detection:', error);
+                });
+            });
+            
+            // Toggle TTS
+            ttsToggle.addEventListener('change', function() {
+                fetch('/toggle_tts', {
+                    method: 'POST',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("TTS toggled");
+                    ttsToggle.checked = data.tts_enabled;
+                })
+                .catch(error => {
+                    console.error('Error toggling TTS:', error);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

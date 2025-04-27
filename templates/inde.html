@@ -1,0 +1,190 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Language Detection</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-top: 20px;
+        }
+        h1 {
+            color: #343a40;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 3px solid #dee2e6;
+        }
+        #video-feed {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .btn-lg {
+            padding: 12px 24px;
+            font-size: 18px;
+        }
+        .detection-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 5px solid #6c757d;
+        }
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sign Language Detection System</h1>
+        
+        <div class="video-container">
+            <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Video Stream">
+        </div>
+        
+        <div class="status" id="status-indicator">
+            Status: <span id="detection-status">Not Running</span>
+            <span id="indicator-dot" class="ms-2" style="color: red;">●</span>
+        </div>
+        
+        <div class="controls">
+            <button id="start-btn" class="btn btn-success btn-lg">
+                <i class="fas fa-play me-2"></i>Start Detection
+            </button>
+            <button id="stop-btn" class="btn btn-danger btn-lg" disabled>
+                <i class="fas fa-stop me-2"></i>Stop Detection
+            </button>
+            <button id="download-btn" class="btn btn-primary btn-lg">
+                <i class="fas fa-file-pdf me-2"></i>Download Results (PDF)
+            </button>
+        </div>
+        
+        <div class="detection-info">
+            <h4><i class="fas fa-info-circle me-2"></i>Detection Information</h4>
+            <p>This application detects sign language gestures in real-time and saves the detected signs.</p>
+            <p>Words detected: <span id="detection-count">0</span></p>
+            <p>Click "Download Results" to get a PDF report of all detected signs with timestamps.</p>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const statusText = document.getElementById('detection-status');
+            const indicatorDot = document.getElementById('indicator-dot');
+            const detectionCount = document.getElementById('detection-count');
+            
+            // Check status periodically
+            function updateStatus() {
+                fetch('/get_detection_status')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.is_running) {
+                            statusText.textContent = 'Running';
+                            statusText.style.color = 'green';
+                            indicatorDot.style.color = 'green';
+                            indicatorDot.classList.add('pulse');
+                            startBtn.disabled = true;
+                            stopBtn.disabled = false;
+                        } else {
+                            statusText.textContent = 'Not Running';
+                            statusText.style.color = 'red';
+                            indicatorDot.style.color = 'red';
+                            indicatorDot.classList.remove('pulse');
+                            startBtn.disabled = false;
+                            stopBtn.disabled = true;
+                        }
+                        detectionCount.textContent = data.detected_count;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching status:', error);
+                    });
+            }
+            
+            // Update status initially and every 2 seconds
+            updateStatus();
+            setInterval(updateStatus, 2000);
+            
+            // Start detection
+            startBtn.addEventListener('click', function() {
+                fetch('/start_detection', {
+                    method: 'POST',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data.message);
+                    updateStatus();
+                })
+                .catch(error => {
+                    console.error('Error starting detection:', error);
+                });
+            });
+            
+            // Stop detection
+            stopBtn.addEventListener('click', function() {
+                fetch('/stop_detection', {
+                    method: 'POST',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data.message);
+                    updateStatus();
+                })
+                .catch(error => {
+                    console.error('Error stopping detection:', error);
+                });
+            });
+            
+            // Download PDF
+            downloadBtn.addEventListener('click', function() {
+                window.location.href = '/download_pdf';
+            });
+        });
+    </script>
+</body>
+</html>
